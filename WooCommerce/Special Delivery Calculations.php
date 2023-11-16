@@ -54,6 +54,7 @@ function pallexcost_transport( $rates, $package ) {
 
         	if( $rate->method_id == 'flat_rate'){
             	// Set rate cost
+                // 1.19 is the VAT (19%), the 1.154 i no longer remember what it was, perhaps a way to calibrate the costs (given the inflation).
             	$rates[$rate_key]->cost = $costTransport * 1.154 * 1.19;
         	}
 
