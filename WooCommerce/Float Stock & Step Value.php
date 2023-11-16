@@ -17,7 +17,7 @@
 add_filter('woocommerce_quantity_input_step', 'nsk_allow_decimal', 10, 2);
 function nsk_allow_decimal($int, $product) {
 
-	$step = get_post_meta($product->get_id(), 'cutie_mp', true);
+	$step = get_post_meta($product->get_id(), 'min_stock', true);
 	$int = round($step, 3);
 
 	return $int;
