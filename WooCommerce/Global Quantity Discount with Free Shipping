@@ -1,0 +1,60 @@
+<?php
+
+add_action( 'woocommerce_before_calculate_totals', 'custom_discount_based_on_quantity', 20, 1 );
+function custom_discount_based_on_quantity( $cart ) {
+    if ( is_admin() && ! defined( 'DOING_AJAX' ) )
+        return;
+
+    // Initialize total quantity
+    $total_quantity = 0;
+
+    // Calculate total quantity
+    foreach ( $cart->get_cart() as $cart_item ) {
+        $quantity = $cart_item['quantity'];
+        $total_quantity += $quantity;
+    }
+
+    // Define the discount rates based on quantity
+    $discount_rate = 0;
+    if ( $total_quantity >= 24 ) {
+        $discount_rate = 16.49;
+    } elseif ( $total_quantity >= 12 ) {
+        $discount_rate = 17.49;
+    } elseif ( $total_quantity >= 7 ) {
+        $discount_rate = 18.49;
+    } elseif ( $total_quantity >= 1 ) {
+        $discount_rate = 19.49;
+    }
+
+    // Apply the discount
+    foreach ( $cart->get_cart() as $cart_item ) {
+        $cart_item['data']->set_price( $discount_rate );
+    }
+}
+
+add_action( 'woocommerce_cart_calculate_fees', 'custom_shipping_cost_based_on_quantity' );
+function custom_shipping_cost_based_on_quantity( $cart ) {
+    if ( is_admin() && ! defined( 'DOING_AJAX' ) )
+        return;
+
+    // Initialize total quantity
+    $total_quantity = 0;
+
+    // Calculate total quantity
+    foreach ( $cart->get_cart() as $cart_item ) {
+        $quantity = $cart_item['quantity'];
+        $total_quantity += $quantity;
+    }
+
+    // Define shipping cost based on quantity
+    if ( $total_quantity >= 12 ) {
+        // Free shipping for 12-23 and over 24 products
+        $shipping_cost = 0;
+    } else {
+        // 19.99 lei for 1-6 and 7-12 products
+        $shipping_cost = 19.99;
+    }
+
+    // Apply the shipping cost
+    $cart->add_fee( 'Livrare', $shipping_cost );
+}
