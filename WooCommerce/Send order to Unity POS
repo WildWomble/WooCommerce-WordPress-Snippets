@@ -1,0 +1,154 @@
+// each product has a custom field for an ID that is within the POS so it knows what product to add to the final invoice
+
+add_action('woocommerce_order_status_changed', 'trimite_comanda_catre_pos', 10, 4);
+function trimite_comanda_catre_pos($order_id, $old_status, $new_status, $order) {
+    if ( ! $order_id ) return;
+	
+	if( in_array( $new_status, ['processing'] ) ) {
+        $order = wc_get_order( $order_id );
+        $items = $order->get_items();
+        $url = ''; // URL given by the Unity POS support team (something like http://xxx.xxx.xxx.xxx:xxxx/unitypos/api)
+        $category_slug = 'pizza';
+
+		// set extra toppings and their prices for easier grabbing
+        $option_prices = [
+            '182'  =>  [ 'name'    =>  'Ananas',            'cost' => 3],
+            '180'  =>  [ 'name'    =>  'Ardei',             'cost' => 3],
+            '177'  =>  [ 'name'    =>  'Ceapa Rosie',       'cost' => 3],
+            '179'  =>  [ 'name'    =>  'Ciuperci',          'cost' => 3],
+            '183'  =>  [ 'name'    =>  'Jalapenos',         'cost' => 3],
+            '181'  =>  [ 'name'    =>  'Masline Negre',     'cost' => 3],
+            '167'  =>  [ 'name'    =>  'Peperoni',          'cost' => 5],
+            '173'  =>  [ 'name'    =>  'Piept de pui',      'cost' => 5],
+            '178'  =>  [ 'name'    =>  'Porumb',            'cost' => 5],
+            '170'  =>  [ 'name'    =>  'Bacon',             'cost' => 5],
+            '168'  =>  [ 'name'    =>  'Carnati Cabanos',   'cost' => 5],
+            '175'  =>  [ 'name'    =>  'Mozzarella',        'cost' => 5],
+            '171'  =>  [ 'name'    =>  'Prosciutto',        'cost' => 5],
+            '169'  =>  [ 'name'    =>  'Salam Napoli',      'cost' => 5],
+            '172'  =>  [ 'name'    =>  'Salsiccia',         'cost' => 5],
+            '174'  =>  [ 'name'    =>  'Ton',               'cost' => 5],
+            '176'  =>  [ 'name'    =>  'Vita',              'cost' => 5]
+        ];
+
+		// build the main array data
+        $UnityPOS_Data = [
+            'client'	=>	[
+                'telefon'	=>	$order->get_billing_phone(),
+                'nume'		=>	$order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
+                'adresa'	=>	$order->get_billing_address_1() . ' ' . $order->get_billing_address_2(),
+                'observatie'=>	$order->get_customer_note()
+            ],
+            'comanda'   =>  []
+        ];
+
+		// put each product in the array
+        foreach( $items as $item_id => $item ) {
+            $qty = $item->get_quantity();
+            $price = $item->get_subtotal();
+            $cod_pos = get_post_meta( $item->get_product_id() , 'id_unitypos', true );
+            
+            $main_product_index = count($UnityPOS_Data['comanda']);
+            $UnityPOS_Data['comanda'][] = [
+                'cod'			=>	$cod_pos,
+                'cantitate'		=>	$qty,
+                'observatie'	=>	'',
+                'pret'			=>	$price,
+            ];
+
+			// gets the extra toppings, using the plugin:
+			// https://wordpress.org/plugins/advanced-product-fields-for-woocommerce/
+			// for adding the toppings for each product which adds them to following meta:
+
+            $wapf_meta = $item->get_meta('_wapf_meta');
+            // Check if _wapf_meta exists and is an array
+            if (is_array($wapf_meta)) {
+                foreach ($wapf_meta as $meta_data) {
+                    // Check if 'value' key exists
+                    if (isset($meta_data['value'])) {
+                        $label = $meta_data['value'];
+                        
+                        // Search for a matching name in the $option_prices array
+                        foreach ($option_prices as $id => $option) {
+                            if ( str_contains(  $label, $option['name'] ) ) {
+                            
+                                $UnityPOS_Data['comanda'][$main_product_index]['pret'] -= $option['cost'];
+                                // Add the data to the final array
+                                $UnityPOS_Data['comanda'][] = [
+                                    'cod'           =>  $id,
+                                    'cantitate'     =>  1,
+                                    'observatie'    =>  $option['name'],
+                                    'pret'          =>  $option['cost'],
+                                ];
+                            }
+                        }
+                    }
+                }
+            }
+            if (has_term($category_slug, 'product_cat', $item->get_product_id())) {
+                $UnityPOS_Data['comanda'][] = [
+                    'cod'           =>  126,
+                    'cantitate'     =>  1,
+                    'observatie'    =>  'Taxa Ambalaj',
+                    'pret'          =>  1,
+                   ];
+            }
+        }
+
+		// add shipping as well
+        $shipping_cost = $order->get_shipping_total();
+        if ($shipping_cost > 0) {
+            $UnityPOS_Data['comanda'][] = [
+                'cod'        => 185,
+                'cantitate'  => 1,
+                'observatie' => 'Livrare',
+                'pret'       => $shipping_cost,
+            ];
+        }
+
+        // Add any fees as separate line items in 'comanda'
+        foreach ($order->get_fees() as $fee) {
+        $name = $fee->get_name();
+        
+        if( $name == 'Oferta 4Krax69Lei' ) {
+            $UnityPOS_Data['comanda'][] = [
+                'cod'        => 187,  // Unique code for fees
+                'cantitate'  => 1,
+                'observatie' => $fee->get_name(),
+                'pret'       => $fee->get_total(),
+            ];
+        }
+        }
+        $json_data = json_encode($UnityPOS_Data);
+        
+        // Initialize cURL session
+        $ch = curl_init();
+        
+        // Set the options for the cURL request
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $json_data);
+        curl_setopt($ch, CURLOPT_INTERFACE, "xxx.xxx.xxx.xxx"); // you server ip
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'Content-Type: application/json',
+            'Host: xxx.xxx.xxx.xxx:xxxx', // Set the Host header explicitly if required
+            'Content-Length: ' . strlen($json_data)
+        ));
+        
+        // Execute the request and get the response
+        $response = curl_exec($ch);
+        
+        // Check for errors
+        if (curl_errno($ch)) {
+            $error_msg = curl_error($ch);
+            error_log('cURL error: ' . $error_msg . ' . Response: ' . $response);
+        } else {
+            // Optionally log the response for debugging
+            error_log('cURL response: ' . $response);
+        }
+        
+        // Close the cURL session
+        curl_close($ch);
+	}
+}
