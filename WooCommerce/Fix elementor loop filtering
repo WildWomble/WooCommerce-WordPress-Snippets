@@ -1,0 +1,24 @@
+/* Elementor uses the endpoint refresh-loop when using the Taxonomy Filter widget
+** By default it will not filter properly when you reset the filters and will cause it to show all the products
+** IMPORTANT:
+** Go to elementor-pro/modules/loop-filter/data/endpoints/refresh-loop.php
+** Add the following in the get_updated_loop_widget_markup() function after the $data = $request->get-params() line:
+
+// ensure this only happens in a category page, the default shop page doesnt need it
+if(is_product_category()) {
+  // Inject current category if not already set
+  if ( empty( $data['widget_filters']['taxonomy']['product_cat'] ) && ! empty( $data['pagination_base_url'] ) ) {
+
+		  $pagination_url = esc_url_raw( $data['pagination_base_url'] );
+		  $parsed_url     = parse_url( $pagination_url );
+
+		  if ( ! empty( $parsed_url['path'] ) ) {
+
+				  // Explode the path into parts and get the last part as the category slug
+				  $path_parts     = array_filter( explode( '/', $parsed_url['path'] ) );
+				  $current_category = array_pop( $path_parts );
+				  $data['widget_filters']['taxonomy']['product_cat'] = array( 'terms' => array( $current_category ) );
+
+		  }
+  }
+}
