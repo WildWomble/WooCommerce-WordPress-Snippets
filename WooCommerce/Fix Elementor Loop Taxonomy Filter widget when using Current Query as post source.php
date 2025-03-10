@@ -2,7 +2,7 @@
 ** By default it will not filter properly when you reset the filters and will cause it to show all the products
 ** IMPORTANT:
 ** Go to elementor-pro/modules/loop-filter/data/endpoints/refresh-loop.php
-** Add the following in the get_updated_loop_widget_markup() function after the $data = $request->get-params() line:
+** Add the following in the get_updated_loop_widget_markup() function after the $data = $request->get-params() line: */
 
 if ( empty( $data['widget_filters']['taxonomy']['product_cat'] ) && ! empty( $data['pagination_base_url'] ) ) {
 
@@ -23,7 +23,7 @@ if ( empty( $data['widget_filters']['taxonomy']['product_cat'] ) && ! empty( $da
 
 
 
-/* also modifying in function "get_hierarchy_of_selected_terms()" (line 150 as of now) the return to be:
+/* also modifying elementor-pro/modules/loop-filter/query/taxonomy-manager.php in function "get_hierarchy_of_selected_terms()" (line 150 as of now) the return to be: */
 
 return 
 	'single-term' => $single_selection_term,
